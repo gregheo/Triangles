@@ -16,6 +16,8 @@ class ViewController: UIViewController {
   var label: UILabel!
   var triangle = RightTriangle(angle: 45)
 
+  let disposeBag = DisposeBag()
+  
   override func viewDidLoad() {
     super.viewDidLoad()
 
