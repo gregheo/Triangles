@@ -22,27 +22,46 @@ class ViewController: UIViewController {
     super.viewDidLoad()
 
     setupViews()
-    updateUI()
 
-    angleSlider.addTarget(self, action: #selector(angleSliderChanged(sender:)), for: .valueChanged)
-    oppositeAngleSlider.addTarget(self, action: #selector(oppositeAngleSliderChanged(sender:)), for: .valueChanged)
-  }
+    // Observable for angle slider: Float -> RightTriangle
+    let angleObservable =
+      angleSlider.rx.value
+        .map({ (angle: Float) in
+          return RightTriangle(angle: Int(angle))
+        })
+    // Observable for opposite angle slider: Float -> RightTriangle
+    let oppositeAngleObservable =
+      oppositeAngleSlider.rx.value.map {
+        RightTriangle(oppositeAngle: Int($0))
+      }
+    // Merged observable of triangles
+    let triangleProvidingObservable =
+      Observable.of(angleObservable, oppositeAngleObservable)
+      .merge()
 
-  func angleSliderChanged(sender: UISlider) {
-    triangle = RightTriangle(angle: Int(sender.value))
-    oppositeAngleSlider.value = Float(triangle.oppositeAngle)
-    updateUI()
-  }
-
-  func oppositeAngleSliderChanged(sender: UISlider) {
-    triangle = RightTriangle(oppositeAngle: Int(sender.value))
-    angleSlider.value = Float(triangle.angle)
-    updateUI()
-  }
-
-  func updateUI() {
-    triangleView.triangle = triangle
-    label.text = "Angle: \(triangle.angle)°\nOpposite angle: \(triangle.oppositeAngle)°"
+    // Binding for text label
+    triangleProvidingObservable
+      .map({ triangle in
+        return "Angle: \(triangle.angle)°\nOpposite angle: \(triangle.oppositeAngle)°"
+      })
+      .bindTo(label.rx.text)
+      .addDisposableTo(disposeBag)
+    // binding for opposite angle slider (when angle slider changes)
+    angleObservable
+      .map({ Float($0.oppositeAngle) })
+      .bindTo(oppositeAngleSlider.rx.value)
+      .addDisposableTo(disposeBag)
+    // binding for angle slider (when opposite angle slider changes)
+    oppositeAngleObservable
+      .map({ Float($0.angle) })
+      .bindTo(angleSlider.rx.value)
+      .addDisposableTo(disposeBag)
+    // subscription for re-drawing triangle view
+    triangleProvidingObservable
+      .subscribe(onNext: { (triangle: RightTriangle) in
+        self.triangleView.triangle = triangle
+      })
+      .addDisposableTo(disposeBag)
   }
 
 }
